@@ -287,3 +287,269 @@ Completed: 2026-10-17
 - **Real end-to-end Google login succeeded (2026-10-17)** with the user's own OAuth client: registering with a real Google account created `user` id 6 ("rahmat mubarok", role 2, status 1) and `customer` id 3 (`google_id` and `google_token` filled); the same account logging in again does not create duplicates. The header still shows "Login / Daftar" until Week 4. (`.env` holds the real Google credentials; `.env.example` keeps empty placeholders.)
 - Database browser: **phpMyAdmin 5.2.3** at http://localhost/phpmyadmin/ (auto-login as MySQL user `adminer`; installed into Laragon's pre-existing `etc/apps/phpMyAdmin` alias target) — registration rows are visible under `db_tokoonline` → `user` / `customer`. Adminer remains available at http://localhost/adminer/ (`adminer` / `adminer`).
 - Environment note: on this machine plain `php artisan serve` initially failed with `Failed to listen on 127.0.0.1:8000 (reason: ?)` — a known Laravel-on-Windows bug (Herd's `php.ini` had `variables_order = "EGPCS"`; Laravel's env whitelist for the child server is case-sensitive, so `Path`/`SystemRoot` were stripped and `php -S` could not bind). Fixed by setting `variables_order = "GPCS"` in `C:\Users\TAMU\.config\herd\bin\php84\php.ini` (backup: `php.ini.egpcs-backup`); plain `php artisan serve` now works.
+
+# Week 5 — Route Group and Middleware
+
+## Goal
+
+The goal of Week 5 is to implement **Route Groups and Middleware** for customer account management.
+
+The implementation ensures that customer account routes are protected and can only be accessed by authenticated customers. It also organizes related customer routes into a single middleware group to make the routing structure cleaner and easier to maintain.
+
+---
+
+## What Was Done
+
+ 1. Created `IsCustomer` Middleware
+
+A custom middleware named `IsCustomer` was created to check whether the authenticated user is allowed to access customer pages.
+
+```text id="17umzh"
+app/Http/Middleware/IsCustomer.php
+```
+
+The middleware verifies that:
+
+- The user is authenticated.
+- The authenticated user has the customer role.
+- Unauthorized users are redirected to the login page.
+
+```php id="9t3cvp"
+if (auth()->check() && auth()->user()->role == 2) {
+    return $next($request);
+}
+
+return redirect('/auth/redirect')
+    ->with('msgError', 'You must login as a customer');
+```
+
+ 2. Registered Customer Middleware
+
+The custom middleware was registered with the alias:
+
+```php id="r4wws8"
+'is.customer' => \App\Http\Middleware\IsCustomer::class,
+```
+
+This allows the middleware to be used easily in the application's routes.
+
+ 3. Implemented Route Group
+
+Customer account routes were grouped under the `is.customer` middleware.
+
+```php id="l35xmv"
+Route::middleware('is.customer')->group(function () {
+
+    Route::get('/customer/akun/{id}', [CustomerController::class, 'akun'])
+        ->name('customer.akun');
+
+    Route::put('/customer/updateakun/{id}', [CustomerController::class, 'updateAkun'])
+        ->name('customer.updateakun');
+
+});
+```
+
+This prevents the middleware declaration from being repeated on every customer route.
+
+ 4. Added Customer Account Management
+
+The customer account feature allows an authenticated customer to:
+
+- View their account information.
+- Edit their name.
+- Edit their email.
+- Edit their phone number.
+- Edit their address.
+- Edit their postal code.
+- Upload or update their profile photo.
+
+ 5. Added Account Access Protection
+
+The application verifies that the requested account ID belongs to the currently authenticated user.
+
+A customer therefore cannot manually change the URL to access another customer's account.
+
+---
+
+## Known Issues from the Module Fixed
+
+Several adjustments were made while implementing the Week 5 module to keep the routes and account management consistent.
+
+ 1. Duplicate Middleware Declaration
+
+The module initially demonstrates middleware individually on each route:
+
+```php id="gck7bj"
+Route::get(...)
+    ->middleware('is.customer');
+
+Route::put(...)
+    ->middleware('is.customer');
+```
+
+This was replaced with a Route Group:
+
+```php id="l4m2q9"
+Route::middleware('is.customer')->group(function () {
+    Route::get(...);
+    Route::put(...);
+});
+```
+
+This avoids repeating the same middleware declaration.
+
+ 2. Inconsistent Update Route
+
+The module shows different versions of the customer update URL.
+
+One example uses:
+
+```text id="5k4qap"
+/customer/akun/{id}/update
+```
+
+while another uses:
+
+```text id="xjj34q"
+/customer/updateakun/{id}
+```
+
+The implementation uses one consistent route:
+
+```php id="xy9xzb"
+Route::put('/customer/updateakun/{id}', [CustomerController::class, 'updateAkun'])
+    ->name('customer.updateakun');
+```
+
+The Blade form also uses the named route:
+
+```blade id="c70h3f"
+route('customer.updateakun', $edit->user_id)
+```
+
+This prevents URL mismatches between the form and the route definition.
+
+ 3. Customer Account Security
+
+Additional validation was used to make sure that a logged-in customer cannot access another customer's account simply by changing the ID in the URL.
+
+If the requested ID does not belong to the authenticated user, the application redirects the user to their own account.
+
+---
+
+## How to Check
+
+ 1. Start the Laravel Application
+
+Run:
+```bash id="8msw5a"
+php artisan serve
+```
+
+Open:
+```text id="rwq4ej"
+http://127.0.0.1:8000
+```
+
+### 2. Check Customer Routes
+
+Run:
+```bash id="vvp78b"
+php artisan route:list --name=customer
+```
+
+The application should contain routes for:
+```text id="uxygeu"
+customer.akun
+customer.updateakun
+```
+
+### 3. Test Middleware
+
+Without logging in, try to access:
+```text id="hd9edr"
+/customer/akun/1
+```
+The application should prevent access and redirect the user to authentication.
+
+### 4. Test Customer Account
+
+Login as a customer and open **Akun Saya**.
+The customer account page should display the current customer information.
+
+### 5. Test Account Update
+
+Change customer information such as:
+```text id="bzd1fj"
+Name
+Email
+Phone Number
+Address
+Postal Code
+Profile Photo
+```
+Click **Save Changes**.
+The updated information should be stored successfully.
+
+### 6. Test Account Protection
+
+For example, if the logged-in user has ID `3`, access:
+```text id="y3id8m"
+/customer/akun/3
+```
+This should work.
+
+Then manually change the URL to:
+```text id="2ov1la"
+/customer/akun/2
+```
+The application should prevent the customer from accessing the other account and redirect them back to their own account.
+
+---
+
+## Files to Inspect
+
+The main files related to the Week 5 implementation are:
+
+```text id="bh6tn4"
+app/
+├── Http/
+│   ├── Controllers/
+│   │   └── CustomerController.php
+│   │
+│   ├── Middleware/
+│   │   └── IsCustomer.php
+│   │
+│   └── Kernel.php
+│
+resources/
+└── views/
+    └── v_customer/
+        └── edit.blade.php
+
+routes/
+└── web.php
+
+storage/
+└── app/
+    └── public/
+        └── img-customer/
+```
+
+## Verified
+
+The Week 5 implementation was checked for the following functionality:
+
+- [v] `IsCustomer` middleware created.
+- [v] Customer middleware registered.
+- [v] Customer routes grouped using Route Group.
+- [v] Customer account route protected by middleware.
+- [v] Customer account page created.
+- [v] Customer profile information can be edited.
+- [v] Customer update route implemented.
+- [v] Profile photo upload supported.
+- [v] Unauthorized access is redirected.
+- [v] Customers cannot access another customer's account by changing the URL.
+- [v] Customer route names can be checked using `php artisan route:list --name=customer`.
+
+**Week 5 — Route Group and Middleware: Completed ✅**
