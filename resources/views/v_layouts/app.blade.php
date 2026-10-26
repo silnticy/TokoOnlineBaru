@@ -107,9 +107,9 @@
 									</div>
 								</div>
 								<ul class="custom-menu">
-									<li><a href="#"><i class="fa fa-user-o"></i> Akun Saya</a></li>
-									<li><a href="#"><i class="fa fa-check"></i> History</a></li>
-									<li>
+									<li><a href="{{ route('customer.akun', ['id' => Auth::user()->id]) }}"><i class="fa fa
+									user-o"></i> Akun Saya</a> 
+									</li> 
 										<a href="#" onclick="event.preventDefault(); document.getElementById('keluar-app').submit();">
 											<i class="fa fa-power-off"></i> Keluar
 										</a>

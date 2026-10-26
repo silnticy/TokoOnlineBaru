@@ -71,3 +71,12 @@ Route::get('backend/laporan/formproduk', [ProdukController::class, 'formProduk']
 Route::post('backend/laporan/cetakproduk', [ProdukController::class, 'cetakProduk'])
     ->name('backend.laporan.cetakproduk')
     ->middleware('auth');
+// group route untuk customer
+Route::middleware('is.customer')->group(function () {
+    // route untuk halaman akun customer
+    Route::get('/customer/akun/{id}', [CustomerController::class, 'akun'])
+        ->name('customer.akun');
+    // route untuk update akun customer
+    Route::put('/customer/updateakun/{id}', [CustomerController::class, 'updateAkun'])
+        ->name('customer.updateakun');
+});
